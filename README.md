@@ -3,6 +3,7 @@
 A GitHub Actions automation that sends you a daily email at 8am with:
 - **Yesterday's match results**
 - **Today's scheduled fixtures**
+- **The latest standings in each group**
 
 No server required — runs entirely on GitHub's free infrastructure.
 
