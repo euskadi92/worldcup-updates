@@ -58,19 +58,23 @@ def team_name(team):
     return team.get("shortName") or team["name"]
 
 
-def match_row(match, show_time=False, today=None):
+DAYS_FR = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"]
+MONTHS_FR = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet",
+             "août", "septembre", "octobre", "novembre", "décembre"]
+
+
+def date_label_fr(d):
+    return f"{DAYS_FR[d.weekday()]} {d.day} {MONTHS_FR[d.month - 1]}"
+
+
+def match_row(match, show_time=False):
     home = team_name(match["homeTeam"])
     away = team_name(match["awayTeam"])
     cell = "padding:6px 8px;white-space:nowrap;"
 
     if show_time:
         utc_time = datetime.fromisoformat(match["utcDate"].replace("Z", "+00:00"))
-        local_dt = utc_time.astimezone(PARIS)
-        time_str = local_dt.strftime("%H:%M")
-        if today and local_dt.date() > today:
-            middle = f"Tonight {time_str}"
-        else:
-            middle = time_str
+        middle = utc_time.astimezone(PARIS).strftime("%H:%M")
     else:
         middle = format_score(match)
 
@@ -82,13 +86,35 @@ def match_row(match, show_time=False, today=None):
         </tr>"""
 
 
-def build_section(title, matches, show_time=False, today=None):
+def date_header_row(label):
+    return f"""
+        <tr>
+          <td colspan="3" style="padding:12px 8px 4px;font-size:13px;font-weight:700;color:#e63946;text-transform:uppercase;letter-spacing:.05em;">{label}</td>
+        </tr>"""
+
+
+def build_section(title, matches, show_time=False):
     if not matches:
         return f"""
         <h2 style="color:#1a1a2e;border-bottom:2px solid #e63946;padding-bottom:6px;">{title}</h2>
         <p style="color:#888;">No matches.</p>"""
 
-    rows = "".join(match_row(m, show_time=show_time, today=today) for m in matches)
+    if show_time:
+        # Group by Paris calendar date
+        from collections import OrderedDict
+        groups = OrderedDict()
+        for m in matches:
+            utc_time = datetime.fromisoformat(m["utcDate"].replace("Z", "+00:00"))
+            d = utc_time.astimezone(PARIS).date()
+            groups.setdefault(d, []).append(m)
+
+        rows = ""
+        for d, group_matches in groups.items():
+            rows += date_header_row(date_label_fr(d))
+            rows += "".join(match_row(m, show_time=True) for m in group_matches)
+    else:
+        rows = "".join(match_row(m, show_time=False) for m in matches)
+
     return f"""
     <h2 style="color:#1a1a2e;border-bottom:2px solid #e63946;padding-bottom:6px;">{title}</h2>
     <table style="width:100%;border-collapse:collapse;font-family:sans-serif;font-size:15px;">
@@ -96,12 +122,12 @@ def build_section(title, matches, show_time=False, today=None):
     </table>"""
 
 
-def build_html(yesterday_str, today_str, yesterday_matches, today_matches, today):
+def build_html(yesterday_str, today_str, yesterday_matches, today_matches):
     yesterday_section = build_section(
         f"Results — {yesterday_str}", yesterday_matches, show_time=False
     )
     today_section = build_section(
-        f"Today's fixtures (Paris time)", today_matches, show_time=True, today=today
+        "Today's fixtures (Paris time)", today_matches, show_time=True
     )
 
     return f"""<!DOCTYPE html>
@@ -164,7 +190,7 @@ def main():
 
     print(f"Found {len(yesterday_matches)} result(s) and {len(today_matches)} fixture(s).")
 
-    html = build_html(yesterday_str, today_str, yesterday_matches, today_matches, today)
+    html = build_html(yesterday_str, today_str, yesterday_matches, today_matches)
     subject = f"⚽ World Cup — {yesterday_str} results & {today_str} fixtures"
 
     send_email(subject, html)
