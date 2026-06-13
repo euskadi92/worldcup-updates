@@ -58,14 +58,19 @@ def team_name(team):
     return team.get("shortName") or team["name"]
 
 
-def match_row(match, show_time=False):
+def match_row(match, show_time=False, today=None):
     home = team_name(match["homeTeam"])
     away = team_name(match["awayTeam"])
     cell = "padding:6px 8px;white-space:nowrap;"
 
     if show_time:
         utc_time = datetime.fromisoformat(match["utcDate"].replace("Z", "+00:00"))
-        middle = utc_time.astimezone(PARIS).strftime("%H:%M")
+        local_dt = utc_time.astimezone(PARIS)
+        time_str = local_dt.strftime("%H:%M")
+        if today and local_dt.date() > today:
+            middle = f"Tonight {time_str}"
+        else:
+            middle = time_str
     else:
         middle = format_score(match)
 
@@ -77,13 +82,13 @@ def match_row(match, show_time=False):
         </tr>"""
 
 
-def build_section(title, matches, show_time=False):
+def build_section(title, matches, show_time=False, today=None):
     if not matches:
         return f"""
         <h2 style="color:#1a1a2e;border-bottom:2px solid #e63946;padding-bottom:6px;">{title}</h2>
         <p style="color:#888;">No matches.</p>"""
 
-    rows = "".join(match_row(m, show_time=show_time) for m in matches)
+    rows = "".join(match_row(m, show_time=show_time, today=today) for m in matches)
     return f"""
     <h2 style="color:#1a1a2e;border-bottom:2px solid #e63946;padding-bottom:6px;">{title}</h2>
     <table style="width:100%;border-collapse:collapse;font-family:sans-serif;font-size:15px;">
@@ -96,7 +101,7 @@ def build_html(yesterday_str, today_str, yesterday_matches, today_matches):
         f"Results — {yesterday_str}", yesterday_matches, show_time=False
     )
     today_section = build_section(
-        f"Today's fixtures — {today_str} (Paris time)", today_matches, show_time=True
+        f"Today's fixtures (Paris time)", today_matches, show_time=True, today=today
     )
 
     return f"""<!DOCTYPE html>
