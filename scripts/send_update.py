@@ -120,13 +120,83 @@ def build_section(title, matches, show_time=False):
     </table>"""
 
 
-def build_html(yesterday_str, today_str, yesterday_matches, today_matches):
+def fetch_standings():
+    data = api_get(f"/competitions/{COMPETITION}/standings")
+    return data.get("standings", [])
+
+
+def build_standings_section(standings):
+    # Keep only group-stage entries (type=TOTAL, group name present)
+    groups = [s for s in standings if s.get("type") == "TOTAL" and s.get("group")]
+    if not groups:
+        return ""
+
+    cell = "padding:4px 8px;font-size:13px;"
+    header_cell = f"{cell}font-weight:700;color:#555;text-transform:uppercase;font-size:11px;letter-spacing:.05em;"
+
+    group_tables = ""
+    for group in groups:
+        group_name = group["group"].replace("GROUP_", "Group ")
+        rows = ""
+        for entry in group["table"]:
+            name = entry["team"].get("shortName") or entry["team"]["name"]
+            p   = entry["playedGames"]
+            w   = entry["won"]
+            d   = entry["draw"]
+            l   = entry["lost"]
+            gf  = entry["goalsFor"]
+            ga  = entry["goalsAgainst"]
+            gd  = entry["goalDifference"]
+            pts = entry["points"]
+            pos = entry["position"]
+            bg = "background:#f0f4ff;" if pos <= 2 else ""
+            rows += f"""
+              <tr style="{bg}">
+                <td style="{cell}color:#888;">{pos}</td>
+                <td style="{cell}font-weight:600;">{name}</td>
+                <td style="{cell}text-align:center;">{p}</td>
+                <td style="{cell}text-align:center;">{w}</td>
+                <td style="{cell}text-align:center;">{d}</td>
+                <td style="{cell}text-align:center;">{l}</td>
+                <td style="{cell}text-align:center;">{gf}:{ga}</td>
+                <td style="{cell}text-align:center;">{gd:+d}</td>
+                <td style="{cell}text-align:center;font-weight:700;">{pts}</td>
+              </tr>"""
+
+        group_tables += f"""
+      <div style="margin-bottom:20px;">
+        <div style="font-size:13px;font-weight:700;color:#e63946;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px;">{group_name}</div>
+        <table style="width:100%;border-collapse:collapse;font-family:sans-serif;">
+          <thead>
+            <tr style="border-bottom:1px solid #ddd;">
+              <th style="{header_cell}text-align:left;" colspan="2">Team</th>
+              <th style="{header_cell}text-align:center;">P</th>
+              <th style="{header_cell}text-align:center;">W</th>
+              <th style="{header_cell}text-align:center;">D</th>
+              <th style="{header_cell}text-align:center;">L</th>
+              <th style="{header_cell}text-align:center;">GF:GA</th>
+              <th style="{header_cell}text-align:center;">GD</th>
+              <th style="{header_cell}text-align:center;">Pts</th>
+            </tr>
+          </thead>
+          <tbody>{rows}
+          </tbody>
+        </table>
+      </div>"""
+
+    return f"""
+    <h2 style="color:#1a1a2e;border-bottom:2px solid #e63946;padding-bottom:6px;">Group Standings</h2>
+    {group_tables}"""
+
+
+def build_html(yesterday_str, today_str, yesterday_matches, today_matches, standings):
     yesterday_section = build_section(
         f"Results — {yesterday_str}", yesterday_matches, show_time=False
     )
     today_section = build_section(
         "Today's fixtures (Paris time)", today_matches, show_time=True
     )
+    standings_section = build_standings_section(standings)
 
     return f"""<!DOCTYPE html>
 <html>
@@ -138,6 +208,8 @@ def build_html(yesterday_str, today_str, yesterday_matches, today_matches):
   {yesterday_section}
   <br>
   {today_section}
+  <br>
+  {standings_section}
   <p style="font-size:12px;color:#aaa;margin-top:32px;">
     Data via football-data.org &nbsp;·&nbsp; Delivered by GitHub Actions
   </p>
@@ -190,9 +262,15 @@ def main():
         print(f"Warning: could not fetch today's matches: {e}")
         today_matches = []
 
-    print(f"Found {len(yesterday_matches)} result(s) and {len(today_matches)} fixture(s).")
+    try:
+        standings = fetch_standings()
+    except URLError as e:
+        print(f"Warning: could not fetch standings: {e}")
+        standings = []
 
-    html = build_html(yesterday_str, today_str, yesterday_matches, today_matches)
+    print(f"Found {len(yesterday_matches)} result(s), {len(today_matches)} fixture(s), {len(standings)} standing group(s).")
+
+    html = build_html(yesterday_str, today_str, yesterday_matches, today_matches, standings)
     subject = f"⚽ World Cup — {yesterday_str} results & {today_str} fixtures"
 
     send_email(subject, html)
