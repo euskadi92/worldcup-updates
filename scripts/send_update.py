@@ -96,7 +96,7 @@ def build_section(title, matches, show_time=False, today=None):
     </table>"""
 
 
-def build_html(yesterday_str, today_str, yesterday_matches, today_matches):
+def build_html(yesterday_str, today_str, yesterday_matches, today_matches, today):
     yesterday_section = build_section(
         f"Results — {yesterday_str}", yesterday_matches, show_time=False
     )
@@ -164,7 +164,7 @@ def main():
 
     print(f"Found {len(yesterday_matches)} result(s) and {len(today_matches)} fixture(s).")
 
-    html = build_html(yesterday_str, today_str, yesterday_matches, today_matches)
+    html = build_html(yesterday_str, today_str, yesterday_matches, today_matches, today)
     subject = f"⚽ World Cup — {yesterday_str} results & {today_str} fixtures"
 
     send_email(subject, html)
