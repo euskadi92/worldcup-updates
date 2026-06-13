@@ -58,13 +58,11 @@ def team_name(team):
     return team.get("shortName") or team["name"]
 
 
-DAYS_FR = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"]
-MONTHS_FR = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet",
-             "août", "septembre", "octobre", "novembre", "décembre"]
+DAYS_EN = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 
 
-def date_label_fr(d):
-    return f"{DAYS_FR[d.weekday()]} {d.day} {MONTHS_FR[d.month - 1]}"
+def date_label(d):
+    return f"{DAYS_EN[d.weekday()]} {d.strftime('%d/%m')}"
 
 
 def match_row(match, show_time=False):
@@ -110,7 +108,7 @@ def build_section(title, matches, show_time=False):
 
         rows = ""
         for d, group_matches in groups.items():
-            rows += date_header_row(date_label_fr(d))
+            rows += date_header_row(date_label(d))
             rows += "".join(match_row(m, show_time=True) for m in group_matches)
     else:
         rows = "".join(match_row(m, show_time=False) for m in matches)
@@ -181,9 +179,13 @@ def main():
     tomorrow_str = tomorrow.isoformat()
 
     try:
-        # Fetch today + tomorrow to catch games starting late at night Paris time
+        # Fetch today + tomorrow to catch games starting late at night Paris time (US timezones)
         upcoming = fetch_matches(today_str, tomorrow_str)
-        today_matches = [m for m in upcoming if m.get("status") not in ("FINISHED",)]
+        today_matches = [
+            m for m in upcoming
+            if m.get("status") != "FINISHED"
+            and datetime.fromisoformat(m["utcDate"].replace("Z", "+00:00")).astimezone(PARIS).date() <= tomorrow
+        ]
     except URLError as e:
         print(f"Warning: could not fetch today's matches: {e}")
         today_matches = []
