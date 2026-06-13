@@ -25,8 +25,10 @@ def api_get(path):
         return json.loads(resp.read())
 
 
-def fetch_matches(date_str):
-    data = api_get(f"/competitions/{COMPETITION}/matches?dateFrom={date_str}&dateTo={date_str}")
+def fetch_matches(date_from, date_to=None):
+    if date_to is None:
+        date_to = date_from
+    data = api_get(f"/competitions/{COMPETITION}/matches?dateFrom={date_from}&dateTo={date_to}")
     return data.get("matches", [])
 
 
@@ -52,33 +54,26 @@ def status_label(status):
     }.get(status, status)
 
 
+def team_name(team):
+    return team.get("shortName") or team["name"]
+
+
 def match_row(match, show_time=False):
-    home = match["homeTeam"]["name"]
-    away = match["awayTeam"]["name"]
-    stage = match.get("stage", "").replace("_", " ").title()
-    group = match.get("group") or ""
+    home = team_name(match["homeTeam"])
+    away = team_name(match["awayTeam"])
+    cell = "padding:6px 8px;white-space:nowrap;"
 
     if show_time:
         utc_time = datetime.fromisoformat(match["utcDate"].replace("Z", "+00:00"))
-        local_time = utc_time.astimezone(PARIS).strftime("%H:%M")
-        detail = f"{local_time} &nbsp;·&nbsp; {stage}{' · ' + group if group else ''}"
-        score_or_time = local_time
-        return f"""
-        <tr>
-          <td style="padding:8px 12px;text-align:right;font-weight:600;">{home}</td>
-          <td style="padding:8px 16px;text-align:center;font-size:18px;font-weight:700;color:#1a1a2e;">{score_or_time}</td>
-          <td style="padding:8px 12px;text-align:left;font-weight:600;">{away}</td>
-          <td style="padding:8px 12px;color:#666;font-size:13px;">{stage}{' · ' + group if group else ''}</td>
-        </tr>"""
+        middle = utc_time.astimezone(PARIS).strftime("%H:%M")
     else:
-        score = format_score(match)
-        status = status_label(match.get("status", ""))
-        return f"""
+        middle = format_score(match)
+
+    return f"""
         <tr>
-          <td style="padding:8px 12px;text-align:right;font-weight:600;">{home}</td>
-          <td style="padding:8px 16px;text-align:center;font-size:18px;font-weight:700;color:#1a1a2e;">{score}</td>
-          <td style="padding:8px 12px;text-align:left;font-weight:600;">{away}</td>
-          <td style="padding:8px 12px;color:#666;font-size:13px;">{status}</td>
+          <td style="{cell}text-align:right;font-weight:600;">{home}</td>
+          <td style="{cell}text-align:center;font-size:17px;font-weight:700;color:#1a1a2e;padding-left:12px;padding-right:12px;">{middle}</td>
+          <td style="{cell}text-align:left;font-weight:600;">{away}</td>
         </tr>"""
 
 
@@ -141,16 +136,18 @@ def main():
     today_str = today.isoformat()
     yesterday_str = yesterday.isoformat()
 
-    print(f"Fetching matches for {yesterday_str} (results) and {today_str} (fixtures)...")
+    print(f"Fetching matches for {yesterday_str}–{today_str} (results) and {today_str} (fixtures)...")
 
     try:
-        yesterday_matches = fetch_matches(yesterday_str)
+        # Fetch yesterday + today to catch late US/Canada games that finished overnight Paris time
+        all_recent = fetch_matches(yesterday_str, today_str)
+        yesterday_matches = [m for m in all_recent if m.get("status") == "FINISHED"]
     except URLError as e:
-        print(f"Warning: could not fetch yesterday's matches: {e}")
+        print(f"Warning: could not fetch results: {e}")
         yesterday_matches = []
 
     try:
-        today_matches = fetch_matches(today_str)
+        today_matches = [m for m in fetch_matches(today_str) if m.get("status") not in ("FINISHED",)]
     except URLError as e:
         print(f"Warning: could not fetch today's matches: {e}")
         today_matches = []
