@@ -146,8 +146,13 @@ def main():
         print(f"Warning: could not fetch results: {e}")
         yesterday_matches = []
 
+    tomorrow = today + timedelta(days=1)
+    tomorrow_str = tomorrow.isoformat()
+
     try:
-        today_matches = [m for m in fetch_matches(today_str) if m.get("status") not in ("FINISHED",)]
+        # Fetch today + tomorrow to catch games starting late at night Paris time
+        upcoming = fetch_matches(today_str, tomorrow_str)
+        today_matches = [m for m in upcoming if m.get("status") not in ("FINISHED",)]
     except URLError as e:
         print(f"Warning: could not fetch today's matches: {e}")
         today_matches = []
