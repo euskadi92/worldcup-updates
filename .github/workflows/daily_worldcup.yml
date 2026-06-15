@@ -2,8 +2,10 @@ name: Daily World Cup Update
 
 on:
   schedule:
-    # 06:00 UTC = 08:00 CEST (Paris, summer). Adjust to 07:00 UTC in winter (CET).
-    - cron: "0 6 * * *"
+    # 03:00 UTC = 05:00 CEST (Paris, summer). GitHub scheduling lag of 2-3h means delivery
+    # typically lands 05:00-08:00 Paris time, after all US/Canada games are done.
+    # Adjust to 04:00 UTC in winter (CET).
+    - cron: "0 3 * * *"
   workflow_dispatch: # allow manual trigger from GitHub UI
 
 jobs:
